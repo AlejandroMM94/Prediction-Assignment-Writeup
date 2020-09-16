@@ -1,0 +1,104 @@
+---
+title: "Prediction Assignment Writeup"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+# Summary
+
+The objective of this assignment is to predict how well Weight Lifting Exercises was performed by six volunteers. Six young health participants were asked to perform one set of 10 repetitions of the Unilateral Dumbbell Biceps Curl in five different fashions: exactly according to the specification (Class A), throwing the elbows to the front (Class B), lifting the dumbbell only halfway (Class C), lowering the dumbbell only halfway (Class D) and throwing the hips to the front (Class E). Class A corresponds to the specified execution of the exercise, while the other 4 classes correspond to common mistakes. Participants were supervised by an experienced weight lifter to make sure the execution complied to the manner they were supposed to simulate. The exercises were performed by six male participants aged between 20-28 years, with little weight lifting experience. Two prediction models, decision tree and random forest, will be tested to predict the class of the performed activity. The model with the highest accuracy will be chosen as the best predictor for the outcome variable. 
+
+# Getting the data 
+The dataset is free to use and [download](http://groupware.les.inf.puc-rio.br/static/har/dataset-har-PUC-Rio-ugulino.zip). For more information visit the website of the [project](http://groupware.les.inf.puc-rio.br/har#ixzz6Y7z2RJwG). 
+
+```{r}
+# After observe the csv file of each dataset, it will be used the na.strings() argument to replace some matching strings with NA. 
+training = read.csv("training.csv", na.strings=c("NA","#DIV/0!",""))
+testData = read.csv("testing.csv", na.strings=c("NA","#DIV/0!",""))
+```
+
+Cite this publication to refer this dataset:
+
+Ugulino, W.; Cardador, D.; Vega, K.; Velloso, E.; Milidiu, R.; Fuks, H. Wearable Computing: Accelerometers' Data Classification of Body Postures and Movements. Proceedings of 21st Brazilian Symposium on Artificial Intelligence. Advances in Artificial Intelligence - SBIA 2012. In: Lecture Notes in Computer Science. , pp. 52-61. Curitiba, PR: Springer Berlin / Heidelberg, 2012. ISBN 978-3-642-34458-9. DOI: 10.1007/978-3-642-34459-6_6.
+
+# Preprocessing of the data 
+Loading the packages 
+
+```{r}
+library(lattice)
+library(ggplot2) 
+library(caret)
+library(randomForest) 
+library(rpart)
+library(rpart.plot) 
+library(rattle)
+```
+
+Removing the colummns with values = NA
+
+```{r}
+set.seed(1234)
+goodColumns <- !apply(training, 2, function(x) sum(is.na(x)) > dim(training)[1] * 0.95  || sum(x=="") > dim(training)[1] * 0.95)
+training <- training[, goodColumns]
+badColumns <- nearZeroVar(training, saveMetrics = TRUE)
+training <- training[, badColumns$nzv==FALSE]
+training$classe = factor(training$classe)
+```
+
+Deleting irrelevant variables for the prediction model 
+
+```{r}
+training <-training[,-c(1:7)]
+testData <-testData[,-c(1:7)]
+```
+
+# Cross-validation 
+Cross-validation of the data will be performed by subsampling the training data into 2 subsamples: trainData (70% of the training dataset) and validData (30% of the training dataset). Both models will be fitted on the trainData dataset, and tested on the validData dataset. The model with the highest accuracy will be tested on the testing dataset. 
+
+```{r}
+training_partition <- createDataPartition(y = training$classe, p=0.70, list=FALSE)
+trainData <- training[training_partition, ] 
+validData <- training[-training_partition, ]
+```
+
+# First Prediction Model: Decision Tree
+
+```{r}
+# Creating the decision tree
+decision_tree <- rpart(classe ~ ., data=trainData, method="class")
+
+# Plotting the decision tree
+fancyRpartPlot(decision_tree)
+
+# Using the model to predict the validation data 
+prediction1 <- predict(decision_tree, validData, type = "class")
+
+# Testing the results 
+confusionMatrix(prediction1, validData$classe)
+```
+
+# Second Prediction Model: Random Forest
+
+```{r}
+# Creating the decision tree
+random_forest <- randomForest(classe ~. , data=trainData, method="class", na.action=na.roughfix)
+
+# Using the model to predict the validation data 
+prediction2 <- predict(random_forest, validData, type = "class")
+
+# Testing the results 
+confusionMatrix(prediction2, validData$classe)
+```
+
+# Conclusion
+
+The results obtained shows that the best model predictor is Random Forest that has an accuracy of 0.9951, and predicts the testData better than the Decision Tree. So, the Random Fores model will be used to predict the testing dataset.
+
+```{r}
+prediction3 <- predict(random_forest, testData)
+prediction3
+```
